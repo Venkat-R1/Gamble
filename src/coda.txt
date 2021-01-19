@@ -1,0 +1,428 @@
+
+INDEX.js
+
+import React from 'react';
+import ReactDOM from 'react-dom';
+
+import App from './App';
+
+
+ReactDOM.render()
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+  document.getElementById('root')
+);
+
+
+
+
+APP.JS
+
+import React from 'react';
+import Player from './Players.js';
+import Result from './Result.js';
+import {BrowserRouter as Router, Route} from 'react-router-dom'
+
+function App() {
+  return (
+    <div >
+      
+      <Router>
+          <Route path ="/result" component ={Result} />
+          <Route path="/" exact component={Player} />  
+          
+        
+      </Router>
+    </div>
+  );
+}
+
+export default App;
+
+
+PLAYER.JS
+
+import React,{Component} from "react";
+import Axios from 'axios';
+import DataTableExtensions from 'react-data-table-component-extensions';
+import 'react-data-table-component-extensions/dist/index.css';
+import DataTable from "react-data-table-component";
+
+
+
+
+const columns = [
+      {
+        name: "Name",
+        selector: "name"
+      },
+      {
+        name: "Level",
+        selector: "level"
+      },
+      {
+        name: "Avatar",
+        cell:row =><img src={row.img} className="table-img" />
+      },
+      {
+        name: "Bet",
+        selector: "bet",
+        sortable: true
+      },
+      {
+        name: "Wins",
+        selector: "wins"
+      },
+      {
+        name: "Lost",
+        selector: "lost"
+      },
+      {
+        name: "Price",
+        selector: "price",
+        sortable: true
+      }
+];
+
+const customStyles ={
+  rows:{
+    style:{
+      backgroundColor:"#d0e8f2"
+    }
+  },
+  headRow:{
+    style:{
+      backgroundColor:"#d0e8f2"
+    }
+  },
+  pagination:{
+    style:{
+      backgroundColor:"#d0e8f2"
+    }
+  },
+  heading:{
+    style:{
+      backgroundColor:"#d0e8f2"
+    }
+  }
+
+}
+var wins = new Array(30).fill(0);
+var lost = new Array(30).fill(0);
+  
+export default class Player extends Component{
+
+    constructor(props){
+        super(props);
+        this.state = {
+            players:[],
+            winner:'',
+            losers:[],
+            selectable:true,
+            selectedRows:[],
+            level:[]
+        }
+        this.onClick = this.onClick.bind(this);
+        this.handelRowClick = this.handelRowClick.bind(this);
+    }
+
+     componentDidMount(){
+        const data =[]
+         Axios.get("https://s3-ap-southeast-1.amazonaws.com/he-public-data/bets7747a43.json")
+         .then(res =>{
+         this.setState({players:res.data})
+        
+        for(let i=0;i<this.state.players.length;i++){
+            const Name = this.state.players[i].Name;
+            const Price = this.state.players[i].Price;
+            const Bet = this.state.players[i].Bet;
+            const Img = this.state.players[i]["Profile Image"];
+            const randomLvl = Math.floor(Math.random()*14) + 1;
+            console.log(randomLvl)
+            this.setState(prevState=>({level:[...prevState.level,randomLvl]}));
+            data.push({
+                "id":i,
+                "name":Name,
+                "price":Price,
+                "bet":Bet,
+                "img":Img,
+                "wins":wins[i],
+                "lost":lost[i],
+                "level":this.state.level[i]
+            })
+        }
+        this.setState({data:data})
+        console.log(data)
+      })
+    }
+  
+    handelRowClick = state => {
+      
+      if(state.selectedCount >= 9){
+        this.setState({selectable:false});
+        
+      }
+      if(state.selectable < 9){
+        this.setState({selectable:true})
+      }
+      this.setState({ selectedRows: state.selectedRows });
+    }
+
+    onClick = (e) =>{
+      
+      let number = Math.floor(Math.random()*9 +1);
+      console.log(number);
+      for(let i=0; i<9;i++){
+        if(Number(this.state.selectedRows[i].bet) === number){
+          const won = this.state.selectedRows[i].id;
+          wins[won] += 1;
+          const price = Number(this.state.selectedRows[i].price)*2
+          this.setState(prevState =>({
+            players:prevState.players.map(obj =>(obj.id === won? Object.assign(obj,{price:price}):obj))
+          }));
+          this.setState({winner:won},()=>{
+            console.log(this.state);
+            this.props.history.push({
+              pathname: '/result',
+              state: { winner:this.state.winner, players:this.state.selectedRows, winningNumber:number, wins:wins, lost:lost}
+            })
+          });
+          
+         
+          
+          console.log("winnner is " + this.state.selectedRows[i].name);
+        }else{
+          lost[this.state.selectedRows[i].id] += 1;
+          this.setState(prevState =>({...prevState,lost}))
+          this.setState(prevState=>({losers:[...prevState.losers,this.state.selectedRows[i]]}))
+        }
+      
+      }
+      
+      
+    }
+
+
+    render(){
+        return(
+        <div>
+        
+            <div className="row">
+            {/* selected players */}
+              <div className="col-lg-2 selections">
+                {this.state.selectedRows.map(selected =>(<h2>{selected.name}</h2>))}
+                <button className="btn btn-dark button" onClick={this.onClick}>START</button>
+              </div>
+              <div className="col-lg-10">
+                <h2 className ="heading">select playing 9</h2>
+                <DataTableExtensions
+                columns={columns}
+                data={this.state.data}
+                print={false}
+                export ={false}
+                              
+                >
+                  <DataTable
+                    className="container"
+                    keys="id"
+                    noHeader
+                    pagination
+                    onSelectedRowsChange={this.handelRowClick}
+                    selectableRows = {this.state.selectable }
+                    customStyles={customStyles}
+                  
+                />
+              </DataTableExtensions>
+              </div>
+            </div>
+            
+            
+        </div>)
+    }
+
+}
+
+RESULT.JS
+  
+
+import React ,{Component} from 'react';
+import { Link } from 'react-router-dom';
+export default class Result extends Component{
+    constructor(props){
+        
+        super(props);
+        this.state={
+            winner : this.props.location.state.winner,
+            players : this.props.location.state.players,
+            wins:this.props.location.state.wins,
+            lost:this.props.location.state.lost,
+            num:this.props.location.state.winningNumber
+        }
+        console.log(this.props.location.state);
+    }
+    render(){
+        const fiveCards = [];
+        for(let i=0;i<5;i++){
+            fiveCards.push(this.state.players[i])
+        }
+        const fourCards = [];
+        for(let j=5;j<9;j++){
+            fourCards.push(this.state.players[j])
+        }
+        return(<div className="page2">
+            
+            <div className ="row">
+                {fiveCards.map(player=>(
+                    <div className="col-lg-2">
+                        <div className = {this.state.winner == player.id ? "winner-card": "loser-card"}>
+                                <img className="card-img" src={player.img} />
+                                <p className="in">{player.name.substring(0,12)}</p>
+                                <p className="in"> level &nbsp;{player.level}</p>
+                                <p ><i class="fas fa-circle-notch pad"></i> {player.price}<i class="fas fa-trophy pad"></i>{this.state.wins[player.id]} </p>
+                                <p> <i class="fas fa-arrow-up pad"></i>{Math.floor(Math.random()*5)+1}</p>
+                                <p className={this.state.winner == player.id ? "winner-result": "loser-result"}>{this.state.winner ==player.id ? "Winner":"Lost"}</p>
+                        </div>
+                    
+                    </div>))}
+                
+            </div>
+            <div className="row circle1">
+                <h1> {this.state.num} </h1>
+            </div>
+            <div className ="row">
+                {fourCards.map(player=>(
+                <div className="col-lg-2">
+                    <div className = {this.state.winner == player.id ? "winner-card": "loser-card"}>
+                                <img className="card-img" src={player.img} />
+                                <p className="in">{player.name.substring(0,12)}</p>
+                                <p className="in"> level &nbsp;{player.level}</p>
+                                <p><i class="fas fa-circle-notch pad"></i> {player.price}<i class="fas fa-trophy pad"></i>{this.state.wins[player.id]} </p>
+                                <p> <i class="fas fa-arrow-up pad"></i>{Math.floor(Math.random()*5)+1}</p>
+                                <p className={this.state.winner == player.id ? "winner-result": "loser-result"}>{this.state.winner ==player.id ? "Winner":"Lost"}</p>
+                    </div>
+                </div>))}
+                
+            </div>
+            
+           
+            <Link to="/"><button className="btn btn-dark button">BACK</button></Link>
+        </div>)
+        
+    }
+}
+
+CSS
+
+body{
+    background-color:#cae4db;
+}
+hr{
+    width:40%;
+}
+.heading{
+    padding:3% 0;
+    color:blue;
+}
+.container{
+    width:70%;
+    text-align: center;
+  
+}
+.selections{
+    height:100vh;
+    
+}
+
+.btn{
+    width:150px;
+    
+}
+.table-img{
+    height:30px;
+    width:30px;
+}
+.card-img{
+    border-radius:15px;
+    height:50px;
+    width:50px;
+    float: left;
+    padding:5px;
+}
+.winner-card{
+    border-radius:20px;
+    background-color: white;
+    height:200px;
+    width:200px;
+    border-color:green;
+    border-style:solid;
+  
+}
+.in{
+    display: flex;
+    padding: 0 10px;
+    font-size:0.8rem;
+}
+
+.loser-card{
+    border-radius:20px;
+    background-color: white;
+    height:180px;
+    width:180px;
+    border-color:red;
+    border-style:solid;
+    
+}
+.loser-result{
+    position: absolute;
+    left:32px;
+    text-align: center;
+    border-top-right-radius:10px;
+    border-top-left-radius: 10px;
+    margin-bottom: 0;
+    height:25px;
+    width:55%;
+    background-color: red;
+    color:white;
+}
+.winner-result{
+    position: absolute;
+    bottom:0;
+    left:32px;
+    text-align: center;
+    border-top-right-radius:10px;
+    border-top-left-radius: 10px;
+    height:25px;
+    width:55%;
+    background-color:green;
+    color:white;
+}
+.circle1{
+    margin:3% 35%;
+    background-color: purple;
+    height: 140px;
+    width:140px;
+    border-radius: 250px;
+    border-color: yellow;
+    border-style: solid;
+    color:white;
+}
+.circle1 h1{
+    position: relative;
+    left:42%;
+    top:30%;
+}
+.page2{
+    padding-top:5%;
+    position: relative;
+    left:10%;
+    right:10%;
+}
+.button{
+    position:fixed;
+    left:20px;
+    bottom:20px;
+}
+.pad{
+    padding:0 10px;
+}
